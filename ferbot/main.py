@@ -21,6 +21,8 @@ elif os.path.isfile('.example.env'):
 FER = 'https://www.fer.unizg.hr'
 USERNAME = os.getenv('USERNAME')
 PASSWORD = os.getenv('PASSWORD')
+CHROME_PATH = os.getenv('CHROME_PATH')
+DRIVER_PATH = os.getenv('DRIVER_PATH')
 INCOMPLETE_DOWNLOADS = os.path.abspath(os.getenv('INCOMPLETE_DOWNLOADS'))
 DESTINATION = os.path.abspath(os.getenv('DESTINATION'))
 
@@ -41,9 +43,9 @@ def driver_context():
     chrome_options.add_argument("--disable-gpu")
     # chrome_options.add_argument("--no-sandbox") # linux only
     # chrome_options.add_argument("--headless")
-    chrome_options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+    chrome_options.binary_location = CHROME_PATH
     # chrome_options.headless = True # also works
-    driver = webdriver.Chrome('/Users/bernardcrnkovic/Downloads/chromedriver', options=chrome_options)
+    driver = webdriver.Chrome(DRIVER_PATH, options=chrome_options)
     try:
         yield driver
     finally:
