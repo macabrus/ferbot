@@ -1,4 +1,4 @@
-# Boring automation tool for FER UniZG
+# A tool for automating _studoš's_ boring tasks
 
 Note: currently, only FER _materijali_ downloading is implemented. Suggest ideas in issues.
 
