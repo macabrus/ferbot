@@ -11,7 +11,7 @@ Prerequisites:
 ## Download _materijali_
 To download all available _materijali_ from FER Intranet, call following script:
 ```bash
-poetry run materijali
+materijali
 ```
 
 Verified to work on Chromium/Mac but should work just fine on any platform combo. If you find any issues,
