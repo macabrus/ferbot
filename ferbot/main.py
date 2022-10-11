@@ -6,34 +6,21 @@ from contextlib import contextmanager
 import requests
 from attr import define
 from bs4 import BeautifulSoup as BS
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as wait
 
-if os.path.isfile('.env'):
-    load_dotenv('.env')
-elif os.path.isfile('.example.env'):
-    load_dotenv('.example.env')
-
-FER = 'https://www.fer.unizg.hr'
-USERNAME = os.getenv('USERNAME')
-PASSWORD = os.getenv('PASSWORD')
-CHROME_PATH = os.getenv('CHROME_PATH')
-DRIVER_PATH = os.getenv('DRIVER_PATH')
-INCOMPLETE_DOWNLOADS = os.path.abspath(os.getenv('INCOMPLETE_DOWNLOADS'))
-DESTINATION = os.path.abspath(os.getenv('DESTINATION'))
-
 
 # initialize driver context
 @contextmanager
-def driver_context():
-    os.makedirs(INCOMPLETE_DOWNLOADS, exist_ok=True)
+def driver_context(config: 'Config'):
+    os.makedirs(config.incomplete_downloads, exist_ok=True)
     chrome_options = Options()
     profile = {
-        "download.default_directory": INCOMPLETE_DOWNLOADS,
+        "download.default_directory": config.incomplete_downloads,
         "download.prompt_for_download": False,
         # "download_restrictions": 3
     }
@@ -43,9 +30,9 @@ def driver_context():
     chrome_options.add_argument("--disable-gpu")
     # chrome_options.add_argument("--no-sandbox") # linux only
     # chrome_options.add_argument("--headless")
-    chrome_options.binary_location = CHROME_PATH
+    chrome_options.binary_location = config.chrome_path
     # chrome_options.headless = True # also works
-    driver = webdriver.Chrome(DRIVER_PATH, options=chrome_options)
+    driver = webdriver.Chrome(config.driver_path, options=chrome_options)
     try:
         yield driver
     finally:
@@ -97,16 +84,16 @@ def wait_iframe(css_sel, driver, timeout=20, poll=0.5):
         EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, css_sel)))
 
 
-def login(driver):
-    driver.get(f"{FER}/login/")
+def login(driver, config: 'Config'):
+    driver.get(f"{config.fer}/login/")
     print('Fetched fer.unizg.hr')
 
     user_in = wait_el('input#username', driver)
-    user_in.send_keys(USERNAME)
+    user_in.send_keys(config.username)
     print('Entered username')
 
     pass_in = wait_el('input#password', driver)
-    pass_in.send_keys(PASSWORD)
+    pass_in.send_keys(config.password)
     print('Entered password')
 
     submit = wait_el('button[type=submit]', driver)
@@ -133,9 +120,9 @@ def get_course_list(driver) -> list[Course]:
 
 
 # skida sve materijale za taj predmet
-def download_course_materials(course: Course, driver):
+def download_course_materials(course: Course, driver, config: 'Config'):
     print(f'--- Downloading materials for {course.name} ---')
-    driver.get(f'{FER}{course.url}/materijali')
+    driver.get(f'{config.fer}{course.url}/materijali')
     cms_area = wait_el('#cms_area_middle', driver)
     cms_area_items = list(BS(cms_area.get_attribute('innerHTML'), 'lxml').children)
     if not cms_area_items:
@@ -152,12 +139,12 @@ def download_course_materials(course: Course, driver):
         print('Clicked prepare download')
         wait_iframe('iframe', driver)
         print('Focus iframe')
-        dls = wait_downloads(INCOMPLETE_DOWNLOADS, nfiles=1)
+        dls = wait_downloads(config.incomplete_downloads, nfiles=1)
         print(f'Awaited downloads: {dls}')
         assert len(dls) == 1
         # url = wait_clickable('a#download_link', driver).get_attribute('href').replace('blob:', '')
-        source = f'{INCOMPLETE_DOWNLOADS}/{dls[0]}'
-        destination = f'{DESTINATION}/{course.name}/materijali/{name}'
+        source = f'{config.incomplete_downloads}/{dls[0]}'
+        destination = f'{config.destination}/{course.name}/materijali/{name}'
         os.makedirs(destination, exist_ok=True)  # ensure dir
         with zipfile.ZipFile(source, 'r') as zip_ref:
             zip_ref.extractall(destination)
@@ -172,11 +159,11 @@ def download_course_materials(course: Course, driver):
         name = file.find_element(By.CSS_SELECTOR, '.name').get_attribute('innerHTML').strip()
         source = file.find_element(By.CSS_SELECTOR, 'a[href]').get_attribute('href')
         _, ext = os.path.splitext(source)
-        destination = f'{DESTINATION}/{course.name}/materijali/{name}.{ext}'
+        destination = f'{config.destination}/{course.name}/materijali/{name}.{ext}'
         if not ext:
             print(f'{source} file extension not present...')
             continue
-        r = requests.get(source, auth=(USERNAME, PASSWORD))
+        r = requests.get(source, auth=(config.username, config.password))
         if r.status_code != 200:
             print(f'Received status code {r.status_code} for file {source}')
             r.close()
@@ -185,14 +172,37 @@ def download_course_materials(course: Course, driver):
                 out.write(bits)
 
 
+@define(kw_only=True)
+class Config:
+    fer: str
+    username: str
+    password: str
+    chrome_path: str
+    driver_path: str
+    incomplete_downloads: str
+    destination: str
+
+
+def try_configs(*paths):
+    for path in paths:
+        if os.path.isfile(path):
+            return dotenv_values(path)
+
+
 def main():
-    with driver_context() as driver:
-        login(driver)
+    env = try_configs('.env', '.example.env')
+    env = {k.lower(): v for k, v in env.items()}
+    config = Config(**env)
+    config.incomplete_downloads = os.path.abspath(config.incomplete_downloads)
+    config.destination = os.path.abspath(config.destination)
+
+    with driver_context(config) as driver:
+        login(driver, config)
         wait_el("a[href='/intranet']", driver)
-        driver.get(f'{FER}/intranet')
+        driver.get(f'{config.fer}/intranet')
         courses = get_course_list(driver)
         for course in courses:
-            download_course_materials(course, driver)
+            download_course_materials(course, driver, config)
         print(courses)
 
 
