@@ -3,7 +3,7 @@
 Note: currently, only FER _materijali_ downloading is implemented. Suggest ideas in issues.
 
 Prerequisites:
-- install python poetry package manager
+- install python's [poetry package manager](https://python-poetry.org/docs)
 - [download webdriver binaries](https://chromedriver.chromium.org/downloads) for your version of browser
 - configure environment variables with your FER Intranet credentials in example `.example.env` file
 - install dependencies with `poetry install`
